@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: iptables
+  namespace: iptables
+  labels:
+    app: iptables-daemonset
+data:
+  iptables.conf: |-
+    {
+      "iptables": [
+        {
+          "protocol": "udp",
+          "source_ip": "255.255.233.233",
+          "source_port": "53",
+          "destination_ip": "192.168.1.4",
+          "destination_port": "30053"
+        },
+        {
+          "protocol": "tcp",
+          "source_ip": "255.255.233.233",
+          "source_port": "53",
+          "destination_ip": "192.168.1.4",
+          "destination_port": "30053"
+        },
+        {
+          "protocol": "tcp",
+          "source_ip": "192.168.100.1",
+          "source_port": "10250",
+          "destination_ip": "192.168.1.4",
+          "destination_port": "10003"
+        },
+        {
+          "protocol": "tcp",
+          "source_ip": "192.168.100.1",
+          "source_port": "10350",
+          "destination_ip": "192.168.1.4",
+          "destination_port": "10003"
+        }
+      ]
+    }
+---
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: iptables-daemonset
+  namespace: iptables
+  labels:
+    app: iptables-daemonset
+spec:
+  selector:
+    matchLabels:
+      app: iptables-daemonset
+  template:
+    metadata:
+      labels:
+        app: iptables-daemonset
+    spec:
+      containers:
+        - name: iptables-daemonset
+          command: ['/iptables-daemonset/iptables-daemonset']
+          image: dockerhub.qingcloud.com/kubeedge/iptables-daemonset
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            capabilities:
+              add:
+                - NET_ADMIN
+                - NET_RAW
+          volumeMounts:
+          - name: config-volume
+            mountPath: /etc/iptables.conf
+      volumes:
+      - name: config-volume
+        configMap:
+          name: iptables
+      hostNetwork: true

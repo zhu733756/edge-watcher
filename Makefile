@@ -78,3 +78,6 @@ CONTROLLER_GEN=$(GOBIN)/controller-gen
 else
 CONTROLLER_GEN=$(shell which controller-gen)
 endif
+
+edge-watcher-agent:
+	docker build -t edge-watcher-agent -f cmd/edgewatcheragent/Dockerfile ./cmd/edgewatcheragent
