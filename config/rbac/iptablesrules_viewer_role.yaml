@@ -1,0 +1,20 @@
+# permissions for end users to view iptablesrules.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: iptablesrules-viewer-role
+rules:
+- apiGroups:
+  - kubeedge.kubesphere.io
+  resources:
+  - iptablesrules
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kubeedge.kubesphere.io
+  resources:
+  - iptablesrules/status
+  verbs:
+  - get

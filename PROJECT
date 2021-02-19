@@ -1,0 +1,10 @@
+domain: kubesphere.io
+repo: kubesphere.io/edge-watcher
+resources:
+- group: kubeedge
+  kind: IPTables
+  version: v1alpha1
+- group: kubeedge
+  kind: IPTablesRules
+  version: v1alpha1
+version: "2"

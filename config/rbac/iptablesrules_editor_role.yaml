@@ -1,0 +1,24 @@
+# permissions for end users to edit iptablesrules.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: iptablesrules-editor-role
+rules:
+- apiGroups:
+  - kubeedge.kubesphere.io
+  resources:
+  - iptablesrules
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kubeedge.kubesphere.io
+  resources:
+  - iptablesrules/status
+  verbs:
+  - get

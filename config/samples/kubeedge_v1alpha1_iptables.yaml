@@ -1,0 +1,7 @@
+apiVersion: kubeedge.kubesphere.io/v1alpha1
+kind: IPTables
+metadata:
+  name: iptables-sample
+spec:
+  # Add fields here
+  foo: bar
