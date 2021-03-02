@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"kubesphere.io/edge-watcher/pkg/edgeservice"
 	"kubesphere.io/edge-watcher/pkg/edgewatcher"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -119,6 +120,8 @@ func main() {
 	}
 
 	go er.Run()
+
+	go edgeservice.Run()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
