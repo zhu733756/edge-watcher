@@ -47,7 +47,9 @@ func WebService() *restful.WebService {
 
 var Container = restful.DefaultContainer
 
-func Run() {
+func Run(kubeconfig string) {
+	InitK8sClient(kubeconfig)
+
 	Container.Add(WebService())
 	enableCORS()
 

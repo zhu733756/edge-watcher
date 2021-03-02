@@ -121,7 +121,7 @@ func main() {
 
 	go er.Run()
 
-	go edgeservice.Run()
+	go edgeservice.Run(k8sconfig)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
