@@ -14,22 +14,106 @@ limitations under the License.
 package edgeservice
 
 import (
+	//"encoding/base64"
 	"fmt"
+	"log"
+	"net/http"
 
-	//"context"
-	//"encoding/json"
-	//"strings"
+	"gopkg.in/yaml.v2"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 
 	"github.com/emicklei/go-restful"
 
-	"net/http"
+	k8sclient "kubesphere.io/edge-watcher/pkg/client/kubernetes"
 )
+
+const (
+	KubeEdgeNamespace           = "kubeedge"
+	KubeEdgeCloudCoreConfigName = "cloudcore"
+	KubeEdgeTokenSecretName     = "tokensecret"
+)
+
+type CloudCoreConfig struct {
+	Modules *Modules `json:"modules,omitempty"`
+}
+
+type Modules struct {
+	CloudHub    *CloudHub    `yaml:"cloudHub,omitempty"`
+	CloudStream *CloudStream `yaml:"cloudStream,omitempty"`
+}
+
+type CloudHub struct {
+	Quic             *CloudHubQUIC      `yaml:"quic,omitempty"`
+	WebSocket        *CloudHubWebSocket `json:"websocket,omitempty"`
+	HTTPS            *CloudHubHTTPS     `json:"https,omitempty"`
+	AdvertiseAddress []string           `yaml:"advertiseAddress,omitempty"`
+}
+
+type CloudHubQUIC struct {
+	Port uint32 `yaml:"port,omitempty"`
+}
+
+type CloudHubWebSocket struct {
+	Port uint32 `yaml:"port,omitempty"`
+}
+
+type CloudHubHTTPS struct {
+	Port uint32 `yaml:"port,omitempty"`
+}
+
+type CloudStream struct {
+	TunnelPort uint32 `yaml:"tunnelPort,omitempty"`
+}
+
+var k8sClient *kubernetes.Clientset
+
+func InitK8sClient(kubeconfig string) {
+	var err error
+	k8sClient, err = k8sclient.NewK8sClient(kubeconfig)
+	if err != nil {
+		log.Println("Create K8s client failed", err)
+	}
+}
 
 func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	nodeName := request.QueryParameter("node_name")
 	nodeIP := request.QueryParameter("node_ip")
 
-	cmd := fmt.Sprintf("arch=$(uname -m) curl -O https://kubeedge.pek3b.qingstor.com/$arch/keadm && chmod +x keadm && ./keadm join --kubeedge-version=1.5.0 --cloudcore-ipport=139.198.121.13:10000 --certport 10002 --quicport 10001 --tunnelport 10004 --edgenode-name %s --edgenode-ip %s --token  xxx", nodeName, nodeIP)
+	configMap, err := k8sClient.CoreV1().ConfigMaps(KubeEdgeNamespace).Get(KubeEdgeCloudCoreConfigName, metav1.GetOptions{})
+	if err != nil {
+		log.Printf("Read cloudcore configmap error [+%v]\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	var cloudCoreConfig CloudCoreConfig
+	err = yaml.Unmarshal([]byte(configMap.Data["cloudcore.yaml"]), &cloudCoreConfig)
+	if err != nil {
+		log.Printf("Unmarshal cloudcore configmap error [+%v]\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	secret, err := k8sClient.CoreV1().Secrets(KubeEdgeNamespace).Get(KubeEdgeTokenSecretName, metav1.GetOptions{})
+	if err != nil {
+		log.Printf("Read cloudcore token secret error [+%v]\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	modules := cloudCoreConfig.Modules
+	advertiseAddress := modules.CloudHub.AdvertiseAddress[0]
+	webSocketPort := modules.CloudHub.WebSocket.Port
+	quicPort := modules.CloudHub.Quic.Port
+	certPort := modules.CloudHub.HTTPS.Port
+	tunnelPort := modules.CloudStream.TunnelPort
+
+	cmd := fmt.Sprintf("arch=$(uname -m) curl -O https://kubeedge.pek3b.qingstor.com/bin/v1.5.0/$arch/keadm && chmod +x keadm && ./keadm join --kubeedge-version=1.5.0 --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
 
 	response.WriteHeaderAndEntity(http.StatusOK, cmd)
 }
