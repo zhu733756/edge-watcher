@@ -22,6 +22,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -79,6 +80,19 @@ func InitK8sClient(kubeconfig string) {
 	}
 }
 
+func getNodeInternalIP(node *corev1.Node) string {
+	ipAddress := ""
+
+	for _, address := range node.Status.Addresses {
+		if address.Type == "InternalIP" {
+			ipAddress = address.Address
+			break
+		}
+	}
+
+	return ipAddress
+}
+
 func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	nodeName := request.QueryParameter("node_name")
 	nodeIP := request.QueryParameter("node_ip")
@@ -89,7 +103,7 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 		log.Printf("Invalid node name: %s\n", msgs[0])
 		response.AddHeader("Content-Type", "text/plain")
 		errMsg := fmt.Sprintf("Invalid node name: %s", msgs[0])
-		response.WriteErrorString(http.StatusInternalServerError, errMsg)
+		response.WriteErrorString(http.StatusBadRequest, errMsg)
 		return
 	}
 
@@ -99,7 +113,42 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 		log.Printf("Invalid node IP: %s\n", nodeIP)
 		response.AddHeader("Content-Type", "text/plain")
 		errMsg := fmt.Sprintf("Invalid node IP: %s", nodeIP)
-		response.WriteErrorString(http.StatusInternalServerError, errMsg)
+		response.WriteErrorString(http.StatusBadRequest, errMsg)
+		return
+	}
+
+	//Check Node name and IP used
+	nodeList, err := k8sClient.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
+		log.Printf("List nodes error [+%v]\n", err)
+		response.AddHeader("Content-Type", "text/plain")
+		response.WriteErrorString(http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	nodeNames := make(map[string]bool, 0)
+	nodeIPs := make(map[string]bool, 0)
+
+	for _, n := range nodeList.Items {
+		nodeNames[n.Name] = true
+		nodeIPs[getNodeInternalIP(&n)] = true
+	}
+
+	_, ok := nodeNames[nodeName]
+	if ok {
+		log.Printf("Node name %s already used\n", nodeName)
+		response.AddHeader("Content-Type", "text/plain")
+		errMsg := fmt.Sprintf("Node name %s already used\n", nodeName)
+		response.WriteErrorString(http.StatusBadRequest, errMsg)
+		return
+	}
+
+	_, ok = nodeIPs[nodeIP]
+	if ok {
+		log.Printf("Node IP %s already used\n", nodeIP)
+		response.AddHeader("Content-Type", "text/plain")
+		errMsg := fmt.Sprintf("Node IP %s already used\n", nodeIP)
+		response.WriteErrorString(http.StatusBadRequest, errMsg)
 		return
 	}
 
