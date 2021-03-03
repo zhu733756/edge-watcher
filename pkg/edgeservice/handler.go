@@ -17,10 +17,12 @@ import (
 	//"encoding/base64"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 
 	"gopkg.in/yaml.v2"
 
+	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -80,6 +82,26 @@ func InitK8sClient(kubeconfig string) {
 func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	nodeName := request.QueryParameter("node_name")
 	nodeIP := request.QueryParameter("node_ip")
+
+	//Validate Node name
+	msgs := validation.NameIsDNSSubdomain(nodeName, false)
+	if len(msgs) != 0 {
+		log.Printf("Invalid node name: %s\n", msgs[0])
+		response.AddHeader("Content-Type", "text/plain")
+		errMsg := fmt.Sprintf("Invalid node name: %s", msgs[0])
+		response.WriteErrorString(http.StatusInternalServerError, errMsg)
+		return
+	}
+
+	//Validate IP address
+	ip := net.ParseIP(nodeIP)
+	if ip == nil {
+		log.Printf("Invalid node IP: %s\n", nodeIP)
+		response.AddHeader("Content-Type", "text/plain")
+		errMsg := fmt.Sprintf("Invalid node IP: %s", nodeIP)
+		response.WriteErrorString(http.StatusInternalServerError, errMsg)
+		return
+	}
 
 	configMap, err := k8sClient.CoreV1().ConfigMaps(KubeEdgeNamespace).Get(KubeEdgeCloudCoreConfigName, metav1.GetOptions{})
 	if err != nil {
