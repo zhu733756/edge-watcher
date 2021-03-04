@@ -155,6 +155,16 @@ func (r *IPTablesReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 			return ctrl.Result{}, err
 		}
 
+		// Install default configmap of edgeNodeJoin
+		edgeNodeJoinDefaultConfigMap := operator.MakeEdgeNodeJoinDefaultConfigMap(it.Namespace)
+		if err := ctrl.SetControllerReference(&it, &edgeNodeJoinDefaultConfigMap, r.Scheme); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if err := r.Create(ctx, &edgeNodeJoinDefaultConfigMap); err != nil && !errors.IsAlreadyExists(err) {
+			return ctrl.Result{}, err
+		}
+
 		return ctrl.Result{}, nil
 	} else {
 		// Reconcile IPTablesRules
