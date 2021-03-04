@@ -14,11 +14,9 @@ limitations under the License.
 package edgeservice
 
 import (
-	//"context"
 	"fmt"
 	"log"
 	"net/http"
-	//"strconv"
 
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful-openapi"
@@ -34,7 +32,7 @@ func WebService() *restful.WebService {
 
 	tags := []string{"Edge"}
 
-	ws.Route(ws.GET("/join/").To(EdgeNodeJoin).
+	ws.Route(ws.GET("nodes/join/").To(EdgeNodeJoin).
 		Doc("Edge node join command").
 		Param(ws.QueryParameter("node_name", "Edge node name.").DataType("string").DefaultValue("").Required(true)).
 		Param(ws.QueryParameter("node_ip", "Edge node internal IP.").DataType("string").DefaultValue("").Required(true)).
