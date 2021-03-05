@@ -218,7 +218,7 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 			uri = fmt.Sprintf("https://kubeedge.pek3b.qingstor.com/bin/%s/$arch/keadm", version)
 		} else {
 			isFromGithub = true
-			uri = fmt.Sprintf("https://github.com/kubeedge/kubeedge/releases/download/%s/keadm-%s-linux-$arch.tar.gz && tar xvf keadm-%s-linux-$arch.tar.gz && cd keadm-%s-linux-$arch/keadm", version, version, version, version)
+			uri = fmt.Sprintf("https://github.com/kubeedge/kubeedge/releases/download/%s/keadm-%s-linux-$arch.tar.gz", version, version)
 		}
 	}
 
@@ -272,7 +272,7 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 
 	var cmd string
 	if isFromGithub {
-		cmd = fmt.Sprintf("arch=$(uname -m); if [ $arch == 'x86_64' ]; then arch='amd64'; fi; curl -LO %s  && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
+		cmd = fmt.Sprintf("arch=$(uname -m); if [ $arch == 'x86_64' ]; then arch='amd64'; fi; curl -LO %s  && tar xvf keadm-%s-linux-$arch.tar.gz && cd keadm-%s-linux-$arch/keadm && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, version, version, advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
 	} else {
 		cmd = fmt.Sprintf("arch=$(uname -m) curl -O %s && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
 	}
