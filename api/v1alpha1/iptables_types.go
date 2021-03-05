@@ -33,6 +33,8 @@ type IPTablesSpec struct {
 	ImagePullPolicy corev1.PullPolicy `json:"imagePullPolicy,omitempty"`
 	// NodeSelector
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// Pod's scheduling constraints.
+	Affinity *corev1.Affinity `json:"affinity,omitempty"`
 	// Tolerations
 	Tolerations []corev1.Toleration `json:"tolerations,omitempty"`
 }

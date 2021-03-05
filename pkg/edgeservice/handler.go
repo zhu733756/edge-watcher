@@ -236,7 +236,7 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	resp := EdgeJoinResponse{
 		Code:   http.StatusOK,
 		Status: StatusSucceeded,
-		Data:   fmt.Sprintf("arch=$(uname -m) curl -O https://kubeedge.pek3b.qingstor.com/bin/v1.5.0/$arch/keadm && chmod +x keadm && ./keadm join --kubeedge-version=1.5.0 --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"])),
+		Data:   fmt.Sprintf("arch=$(uname -m) && curl -O https://kubeedge.pek3b.qingstor.com/bin/v1.5.0/$arch/keadm && chmod +x keadm && ./keadm join --kubeedge-version=1.5.0 --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"])),
 	}
 	bf := bytes.NewBufferString("")
 	jsonEncoder := json.NewEncoder(bf)
