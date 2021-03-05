@@ -188,7 +188,7 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	}
 
 	// Get configmap for edgeNodeJoin
-
+	var isFromGithub bool
 	nodeJoinCmdConfigMap, err := k8sClient.CoreV1().ConfigMaps(KubeEdgeNamespace).Get(EdgeNodeJoinCmd, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("EdgeNodeJoin: Read edgenodeJoin default configmap error [+%v]\n", err)
@@ -203,21 +203,22 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	}
 
 	version, ok := nodeJoinCmdConfigMap.Data["version"]
-	if !ok {
+	if !ok || version == "" {
 		version = "v1.5.0"
 	}
 
-	kkzone, ok := nodeJoinCmdConfigMap.Data["kkzone"]
-	if !ok {
-		kkzone = "zh"
+	zone, ok := nodeJoinCmdConfigMap.Data["zone"]
+	if !ok || zone == "" {
+		zone = "zh"
 	}
 
 	uri, ok := nodeJoinCmdConfigMap.Data["uri"]
-	if !ok {
-		if kkzone == "zh" {
-			uri = fmt.Sprintf("https://kubeedge.pek3b.qingstor.com/%s/bin/%s/$arch/keadm", version, version)
+	if !ok || uri == "" {
+		if zone == "zh" {
+			uri = fmt.Sprintf("https://kubeedge.pek3b.qingstor.com/bin/%s/$arch/keadm", version)
 		} else {
-			uri = fmt.Sprintf("https://github.com/kubeedge/kubeedge/releases/download/%s/keadm-%s-linux-$arch.tar.gz", version, version)
+			isFromGithub = true
+			uri = fmt.Sprintf("https://github.com/kubeedge/kubeedge/releases/download/%s/keadm-%s-linux-$arch.tar.gz && tar xvf keadm-%s-linux-$arch.tar.gz && cd keadm-%s-linux-$arch/keadm", version, version, version, version)
 		}
 	}
 
@@ -269,10 +270,17 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	certPort := modules.CloudHub.HTTPS.Port
 	tunnelPort := modules.CloudStream.TunnelPort
 
+	var cmd string
+	if isFromGithub {
+		cmd = fmt.Sprintf("arch=$(uname -m); if [ $arch == 'x86_64' ]; then arch='amd64'; fi; curl -LO %s  && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
+	} else {
+		cmd = fmt.Sprintf("arch=$(uname -m) curl -O %s && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
+	}
+
 	resp := EdgeJoinResponse{
 		Code:   http.StatusOK,
 		Status: StatusSucceeded,
-		Data:   fmt.Sprintf("arch=$(uname -m) curl -O %s && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"])),
+		Data:   cmd,
 	}
 	bf := bytes.NewBufferString("")
 	jsonEncoder := json.NewEncoder(bf)

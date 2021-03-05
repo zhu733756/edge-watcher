@@ -12,8 +12,8 @@ const (
 func MakeEdgeNodeJoinDefaultConfigMap(itNamespace string) corev1.ConfigMap {
 	cm := map[string]string{
 		"version": "v1.5.0",
-		"kkzone":  "zh",
-		"uri":     "https://kubeedge.pek3b.qingstor.com",
+		"zone":    "zh",
+		"uri":     "",
 	}
 	return corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
