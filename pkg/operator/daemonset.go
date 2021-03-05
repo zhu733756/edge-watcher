@@ -121,6 +121,7 @@ func MakeDaemonSet(it kubeedgev1alpha1.IPTables) appsv1.DaemonSet {
 						},
 					},
 					NodeSelector: it.Spec.NodeSelector,
+					Affinity:     it.Spec.Affinity,
 					Tolerations:  it.Spec.Tolerations,
 					HostNetwork:  true,
 				},
