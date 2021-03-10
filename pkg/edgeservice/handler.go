@@ -20,6 +20,8 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 
@@ -31,12 +33,6 @@ import (
 	"github.com/emicklei/go-restful"
 
 	k8sclient "kubesphere.io/edge-watcher/pkg/client/kubernetes"
-)
-
-const (
-	KubeEdgeNamespace           = "kubeedge"
-	KubeEdgeCloudCoreConfigName = "cloudcore"
-	KubeEdgeTokenSecretName     = "tokensecret"
 )
 
 type CloudCoreConfig struct {
@@ -79,8 +75,16 @@ type EdgeJoinResponse struct {
 }
 
 const (
-	StatusSucceeded = "Succeeded"
-	StatusFailure   = "Failure"
+	KubeEdgeNamespace           = "kubeedge"
+	KubeEdgeCloudCoreConfigName = "cloudcore"
+	KubeEdgeTokenSecretName     = "tokensecret"
+	StatusSucceeded             = "Succeeded"
+	StatusFailure               = "Failure"
+	EdgeWatcherConfig           = "edge-watcher-config"
+)
+
+var (
+	availableRegions = map[string]bool{"zh": true, "en": true}
 )
 
 var k8sClient *kubernetes.Clientset
@@ -186,6 +190,37 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 		return
 	}
 
+	// Get configmap for edgeNodeJoin
+	region := os.Getenv("REGION")
+	version := os.Getenv("VERSION")
+	edgeWatcherConfig, err := k8sClient.CoreV1().ConfigMaps(KubeEdgeNamespace).Get(EdgeWatcherConfig, metav1.GetOptions{})
+	if err == nil {
+		version, _ = edgeWatcherConfig.Data["version"]
+		region, _ = edgeWatcherConfig.Data["region"]
+		if _, ok := availableRegions[region]; !ok || version == "" {
+			msg := fmt.Sprintf("EdgeNodeJoin: Edge-watcher-config configured, but the given values were incorrect: version=%s, region=%s\n", version, region)
+			log.Println(msg)
+			response.AddHeader("Content-Type", "text/json")
+			response.WriteHeader(http.StatusBadRequest)
+			response.WriteAsJson(&EdgeJoinResponse{
+				Code:    http.StatusBadRequest,
+				Status:  StatusFailure,
+				Message: msg,
+			})
+			return
+		}
+	}
+
+	uri, ok := edgeWatcherConfig.Data["uri"]
+	if !ok || uri == "" {
+		if region == "zh" {
+			uri = fmt.Sprintf("https://kubeedge.pek3b.qingstor.com/bin/%s/$arch/keadm-%s-linux-$arch.tar.gz", version, version)
+		} else {
+			uri = fmt.Sprintf("https://github.com/kubesphere/kubeedge/releases/download/%s-kubesphere/keadm-%s-linux-$arch.tar.gz", version, version)
+		}
+	}
+
+	// Get configmap for cloudcore
 	configMap, err := k8sClient.CoreV1().ConfigMaps(KubeEdgeNamespace).Get(KubeEdgeCloudCoreConfigName, metav1.GetOptions{})
 	if err != nil {
 		log.Printf("EdgeNodeJoin: Read cloudcore configmap error [+%v]\n", err)
@@ -233,10 +268,17 @@ func EdgeNodeJoin(request *restful.Request, response *restful.Response) {
 	certPort := modules.CloudHub.HTTPS.Port
 	tunnelPort := modules.CloudStream.TunnelPort
 
+	var cmd string
+	if region == "zh" {
+		cmd = fmt.Sprintf("arch=$(uname -m); curl -LO %s  && tar xvf keadm-%s-linux-$arch.tar.gz && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, strings.ReplaceAll(version, "v", ""), advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
+	} else {
+		cmd = fmt.Sprintf("arch=$(uname -m); if [ $arch == 'x86_64' ]; then arch='amd64'; fi; curl -LO %s  && tar xvf keadm-%s-linux-$arch.tar.gz && chmod +x keadm && ./keadm join --kubeedge-version=%s --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", uri, version, strings.ReplaceAll(version, "v", ""), advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"]))
+	}
+
 	resp := EdgeJoinResponse{
 		Code:   http.StatusOK,
 		Status: StatusSucceeded,
-		Data:   fmt.Sprintf("arch=$(uname -m) && curl -O https://kubeedge.pek3b.qingstor.com/bin/v1.5.0/$arch/keadm && chmod +x keadm && ./keadm join --kubeedge-version=1.5.0 --cloudcore-ipport=%s:%d --quicport %d --certport %d --tunnelport %d --edgenode-name %s --edgenode-ip %s --token %s", advertiseAddress, webSocketPort, quicPort, certPort, tunnelPort, nodeName, nodeIP, string(secret.Data["tokendata"])),
+		Data:   cmd,
 	}
 	bf := bytes.NewBufferString("")
 	jsonEncoder := json.NewEncoder(bf)
