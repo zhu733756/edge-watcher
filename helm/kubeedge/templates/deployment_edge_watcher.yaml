@@ -25,7 +25,7 @@ spec:
         name: manager
         env:
         - name: VERSION
-          value: v1.5.0
+          value: {{ .Values.cloudCore.tag }}
         - name: REGION
           value: zh
         resources:
